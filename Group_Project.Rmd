@@ -1,0 +1,89 @@
+---
+title: "Group_Project_04072022"
+author: "Chuck Zhou, Carl Weedman, Mark Bruno, Martin Hvezda, Patrick Holstad, and Felipe Prata"
+date: "4/7/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Data Exploration
+```{r}
+hotel <- read.csv("hotel_bookings.csv", stringsAsFactors = TRUE)
+```
+## Data Cleaning
+### Reducing # of Levels for Agents, Company, and Country
+```{r}
+#sort(table(hotel$agent), decreasing = TRUE)[1:10]
+hotel$newagent <- ifelse(hotel$agent == "9" | hotel$agent == "NULL" | hotel$agent == "240" | hotel$agent == "1"| hotel$agent == "14" | hotel$agent == "7" | hotel$agent == "6",  hotel$agent, "other")
+#sort(table(hotel$newagent), decreasing = TRUE)
+
+#sort(table(hotel$company), decreasing = TRUE)[1:10]
+hotel$newcompany <- ifelse(hotel$company == "40" | hotel$company == "NULL" | hotel$company == "223" ,  hotel$company, "other")
+#sort(table(hotel$newcompany), decreasing = TRUE)
+
+#sort(table(hotel$country), decreasing = TRUE)[1:10]
+hotel$newcountry <- ifelse(hotel$country == "PRT" | hotel$country == "GBR" | hotel$country == "FRA" | hotel$country == "ESP" | hotel$country == "DEU",  hotel$country, "other")
+#sort(table(hotel$newcountry), decreasing = TRUE)[1:10]
+
+hotel$newagent <- as.factor(hotel$newagent)
+hotel$newcompany <- as.factor(hotel$newcompany)
+hotel$newcountry <- as.factor(hotel$newcountry)
+```
+### Removing Unnecessary Columns
+```{r}
+hotel$reservation_status_date <- NULL
+hotel$arrival_date_year <- NULL
+hotel$agent <- NULL
+hotel$company <- NULL
+hotel$country <- NULL
+```
+## Creating Dummy Variables
+```{r}
+hoteldummy <- as.data.frame(model.matrix(~.-1,hotel))
+
+```
+### Removing Unwanted Characters
+```{r}
+colnames(hoteldummy) <- gsub("-","",colnames(hoteldummy))
+
+```
+
+```{r}
+#str(hoteldummy)
+```
+
+## Test and Train Set
+```{r}
+set.seed(12345)
+test_set <- sample(1:nrow(hoteldummy), 0.2*nrow(hoteldummy))
+hotel_test <- hoteldummy[test_set,]
+hotel_train <- hoteldummy[-test_set, ]
+
+```
+
+## Linear Regression Model
+```{r}
+
+model1 <- lm(reservation_statusNoShow ~., data = hotel_train)
+summary(model1)
+```
+
+## Project Q&A
+
+1. Business Problem: We are trying to predict who are "no shows". Understanding who are "no shows" will allow us to opitimize overbooking for hotels.
+
+2. We are using a modified data set on hotel bookings where we have 119,386 rows of data with 72 columns. We are using this data to predict "no-show" customers using all available columns.
+
+3. Number of levels for columns "agent, country, and company" presents a problem for creating dummy variables. Solved this by picking top 5-6 in each column and categorizing all others into "other".
+
+4. "No-Show" data allows client to optimize overbooking at the hotel and maximize revenue.
+
+5. Pursuing this project will potentially optimize revenue yield management.
