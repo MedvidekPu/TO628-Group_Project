@@ -1,0 +1,208 @@
+---
+title: "Group_Project_04072022"
+author: "Chuck Zhou, Carl Weedman, Mark Bruno, Martin Hvezda, Patrick Holstad, and Felipe Prata"
+date: "4/7/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+    
+    
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project Q&A
+
+1. Business Problem: We are trying to predict who are "no shows". Understanding who are "no shows" will allow us to opitimize overbooking for hotels.
+
+2. We are using a modified data set on hotel bookings where we have 119,386 rows of data with 72 columns. We are using this data to predict "no-show" customers using all available columns.
+
+3. Number of levels for columns "agent, country, and company" presents a problem for creating dummy variables. Solved this by picking top 5-6 in each column and categorizing all others into "other".
+
+4. "No-Show" data allows client to optimize overbooking at the hotel and maximize revenue.
+
+5. Pursuing this project will potentially optimize revenue yield management.
+
+## Data Exploration
+```{r}
+library(caret)
+library(C50)
+library(gmodels)
+library(class)
+library(neuralnet)
+library(ModelMetrics)
+library(corrplot)
+hotel <- read.csv("hotel_bookings.csv", stringsAsFactors = TRUE)
+```
+## Data Cleaning
+### Reducing # of Levels for Agents, Company, and Country
+```{r}
+#sort(table(hotel$agent), decreasing = TRUE)[1:10]
+hotel$newagent <- ifelse(hotel$agent == "9" | hotel$agent == "NULL" | hotel$agent == "240" | hotel$agent == "1"| hotel$agent == "14" | hotel$agent == "7" | hotel$agent == "6",  hotel$agent, "other")
+#sort(table(hotel$newagent), decreasing = TRUE)
+#sort(table(hotel$company), decreasing = TRUE)[1:10]
+hotel$newcompany <- ifelse(hotel$company == "40" | hotel$company == "NULL" | hotel$company == "223" ,  hotel$company, "other")
+#sort(table(hotel$newcompany), decreasing = TRUE)
+#sort(table(hotel$country), decreasing = TRUE)[1:10]
+hotel$newcountry <- ifelse(hotel$country == "PRT" | hotel$country == "GBR" | hotel$country == "FRA" | hotel$country == "ESP" | hotel$country == "DEU",  hotel$country, "other")
+#sort(table(hotel$newcountry), decreasing = TRUE)[1:10]
+hotel$newagent <- as.factor(hotel$newagent)
+hotel$newcompany <- as.factor(hotel$newcompany)
+hotel$newcountry <- as.factor(hotel$newcountry)
+```
+
+### Removing Unnecessary Columns
+```{r}
+hotel$reservation_status_date <- NULL
+hotel$arrival_date_year <- NULL
+hotel$agent <- NULL
+hotel$company <- NULL
+hotel$country <- NULL
+hotel$reservation_status <- NULL
+
+str(hotel)
+```
+## Creating Dummy Variables
+```{r}
+hoteldummy <- as.data.frame(model.matrix(~.-1,hotel))
+
+str(hotel)
+table(hotel$is_canceled) # Data is balanced
+```
+### Removing Unwanted Characters
+```{r}
+colnames(hoteldummy) <- gsub("-","",colnames(hoteldummy))
+
+
+# MULTIPLE UNIVARIATE REGRESSION FOR DATA EXPLANATORY POWER ANALYSIS
+compress <- lapply(names(hotel),
+       function(var) {
+         formula    <- as.formula(paste("is_canceled ~", var))
+         res.logist <- glm(formula, data = hotel, family = binomial(link="logit"))
+         gini(res.logist)
+       })
+
+univariate_gini_output <- data.frame(matrix(nrow=length(names(hotel)),ncol=2))
+names(univariate_gini_output)=c("Variable","Gini_coefficient")
+univariate_gini_output$Variable=names(hotel)
+univariate_gini_output$Gini_coefficient=compress
+
+# Transform the list to dataframe for sorting
+univariate_gini_output <- as.data.frame(lapply(univariate_gini_output, unlist))
+
+# FINAL OUTPUT FOR VARIABLES WITH GINI OVER 6 %
+sorted_data <- univariate_gini_output[order(univariate_gini_output$Gini_coefficient,decreasing=TRUE),]
+```
+
+## Build the models
+
+```{r}
+
+# PLM
+model_plm <- lm(is_canceled ~., data = hoteldummy)
+
+plm_pred <- predict(model_plm, hoteldummy, type = "response")
+binary_plm <- ifelse(plm_pred >= 0.5, 1, 0)
+
+CrossTable(binary_plm, hoteldummy$is_canceled, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+
+kappa_plm <- caret::confusionMatrix(as.factor(hoteldummy$is_canceled), as.factor(binary_plm), positive = "1")$overall[2]
+acc_plm <- caret::confusionMatrix(as.factor(hoteldummy$is_canceled), as.factor(binary_plm), positive = "1")$overall[1]
+
+cat('Linear Regression: ','Accuracy Ratio: ',acc_plm,'Kappa:',kappa_plm)
+
+# LOGIT
+
+model_logit <- glm(is_canceled ~., data = hoteldummy,  family = "binomial")
+
+logit_pred <- predict(model_logit, hoteldummy, type = "response")
+binary_logit <- ifelse(logit_pred >= 0.5, 1, 0)
+
+CrossTable(binary_logit, hoteldummy$is_canceled, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+
+kappa_logit <- caret::confusionMatrix(as.factor(hoteldummy$is_canceled), as.factor(binary_logit), positive = "1")$overall[2]
+acc_logit <- caret::confusionMatrix(as.factor(hoteldummy$is_canceled), as.factor(binary_logit), positive = "1")$overall[1]
+
+cat('Linear Regression: ','Accuracy Ratio: ',acc_logit,'Kappa:',kappa_logit)
+
+# KNN
+
+knn_pred <- knn(train = hoteldummy[, names(hoteldummy) != "is_canceled"], test = hoteldummy[, names(hoteldummy) != "is_canceled"], cl = hoteldummy$is_canceled, k = 100) 
+
+CrossTable(knn_pred, hoteldummy$is_canceled, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+
+kappa_knn <- confusionMatrix(as.factor(hoteldummy$is_canceled), as.factor(knn_pred), positive = "1")$overall[2]
+acc_knn <- confusionMatrix(as.factor(hoteldummy$is_canceled), as.factor(knn_pred), positive = "1")$overall[1]
+
+cat('KNN: ','Accuracy Ratio: ',acc_knn,'Kappa:',kappa_knn)
+
+# ANN
+ann <- neuralnet(ChurnYes ~ . ,data = telco_norm, linear.output = F, stepmax = 1e8)
+
+#predict(ann, telco_norm$ChurnYes)
+#ann_result <- compute(ann, telco_norm$ChurnYes)
+
+ann_pred <- data.frame(ann$net.result)
+binary_ann <- ifelse(ann_pred >= 0.5, 1, 0)
+
+
+CrossTable(telco_norm$ChurnYes, binary_ann[,2], prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+
+kappa_ann <- confusionMatrix(as.factor(telco_norm$ChurnYes), as.factor(binary_ann[,2]), positive = "1")$overall[2]
+acc_ann <- confusionMatrix(as.factor(telco_norm$ChurnYes), as.factor(binary_ann[,2]), positive = "1")$overall[1]
+
+cat('ANN: ','Accuracy Ratio: ',acc_ann,'Kappa:',kappa_ann)
+
+# Decision Tree
+dt <- C5.0(ChurnYes ~. , data=telco_norm)
+dt_pred <- predict(dt, telco_norm)
+
+
+CrossTable(telco_norm$ChurnYes, dt_pred, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+
+kappa_dt <- confusionMatrix(as.factor(telco_norm$ChurnYes), as.factor(dt_pred), positive = "1")$overall[2]
+acc_dt <- confusionMatrix(as.factor(telco_norm$ChurnYes), as.factor(dt_pred), positive = "1")$overall[1]
+
+cat('Decision Tree: ','Accuracy Ratio: ',acc_dt,'Kappa:',kappa_dt)
+
+```
+## Test and Train Set
+```{r}
+set.seed(12345)
+test_set <- sample(1:nrow(hoteldummy), 0.2*nrow(hoteldummy))
+hotel_test <- hoteldummy[test_set,]
+hotel_train <- hoteldummy[-test_set, ]
+```
+
+## Build a stacked model
+
+```{r warning= FALSE}
+combined <- data.frame(binary_plm, binary_logit,knn_pred, binary_ann[,2],dt_pred,telco_norm$ChurnYes)
+colnames(combined) <- c('binary_plm', 'binary_logit','knn_pred', 'binary_ann','dt_pred','ChurnYes')
+
+## Getting Train and Test Samples
+
+# Selects 10000 random rows for test data
+set.seed(12345)
+test_set <- sample(1:nrow(combined), 0.2*nrow(combined))
+
+telco_train <- combined[-test_set, ]
+telco_test <- combined[test_set, ]
+
+# Second-Level Decision Tree
+combined_model <- C5.0(ChurnYes ~. , data=telco_train)
+combined_pred <- predict(combined_model, telco_test)
+
+CrossTable(telco_test$ChurnYes, combined_pred, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+
+kappa_combined <- confusionMatrix(as.factor(telco_test$ChurnYes), as.factor(combined_pred), positive = "1")$overall[2]
+acc_combined <- confusionMatrix(as.factor(telco_test$ChurnYes), as.factor(combined_pred), positive = "1")$overall[1]
+
+plot(combined_model)
+
+cat('Combined model: ','Accuracy Ratio: ',acc_combined,'Kappa:',kappa_combined)
+```
