@@ -170,14 +170,6 @@ acc_dt <- confusionMatrix(as.factor(telco_norm$ChurnYes), as.factor(dt_pred), po
 cat('Decision Tree: ','Accuracy Ratio: ',acc_dt,'Kappa:',kappa_dt)
 
 ```
-## Test and Train Set
-```{r}
-set.seed(12345)
-test_set <- sample(1:nrow(hoteldummy), 0.2*nrow(hoteldummy))
-hotel_test <- hoteldummy[test_set,]
-hotel_train <- hoteldummy[-test_set, ]
-```
-
 ## Build a stacked model
 
 ```{r warning= FALSE}
@@ -188,10 +180,9 @@ colnames(combined) <- c('binary_plm', 'binary_logit','knn_pred', 'binary_ann','d
 
 # Selects 10000 random rows for test data
 set.seed(12345)
-test_set <- sample(1:nrow(combined), 0.2*nrow(combined))
-
-telco_train <- combined[-test_set, ]
-telco_test <- combined[test_set, ]
+test_set <- sample(1:nrow(hoteldummy), 0.2*nrow(hoteldummy))
+hotel_test <- hoteldummy[test_set,]
+hotel_train <- hoteldummy[-test_set, ]
 
 # Second-Level Decision Tree
 combined_model <- C5.0(ChurnYes ~. , data=telco_train)
