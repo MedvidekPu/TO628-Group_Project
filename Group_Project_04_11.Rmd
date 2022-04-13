@@ -97,6 +97,16 @@ univariate_gini_output <- as.data.frame(lapply(univariate_gini_output, unlist))
 # FINAL OUTPUT FOR VARIABLES WITH GINI OVER 6 %
 sorted_data <- univariate_gini_output[order(univariate_gini_output$Gini_coefficient,decreasing=TRUE),]
 ```
+## Normalize and Randomize Data
+```{r}
+normalize <- function(x){
+  (x-min(x))/(max(x)-min(x))
+}
+
+hotel_n <- as.data.frame(lapply(hoteldummy, normalize))
+
+hotelrand <- hotel_n[sample(1:nrow(hotel_n)),]
+```
 
 ## Build the models
 
