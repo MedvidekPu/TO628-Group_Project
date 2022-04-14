@@ -101,7 +101,7 @@ hotelrand <- hotel_n[sample(1:nrow(hotel_n)),]
 
 ## Build the models
 
-```{r}
+```{r cache=TRUE, warning=FALSE}
 # LOGIT
 model_logit <- glm(is_canceled ~., data = hotelrand,  family = "binomial")
 logit_pred <- predict(model_logit, hotelrand, type = "response")
@@ -112,7 +112,7 @@ acc_logit <- caret::confusionMatrix(as.factor(hotelrand$is_canceled), as.factor(
 cat('Linear Regression: ','Accuracy Ratio: ',acc_logit,'Kappa:',kappa_logit)
 ```
 
-```{r}
+```{r cache=TRUE, warning=FALSE}
 # KNN
 knn_pred <- knn(train = hotelrand[, names(hotelrand) != "is_canceled"], test = hotelrand[, names(hotelrand) != "is_canceled"], cl = hotelrand$is_canceled, k = 100) 
 CrossTable(knn_pred, hotelrand$is_canceled, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
@@ -121,7 +121,7 @@ acc_knn <- confusionMatrix(as.factor(hotelrand$is_canceled), as.factor(knn_pred)
 cat('KNN: ','Accuracy Ratio: ',acc_knn,'Kappa:',kappa_knn)
 ```
 
-```{r}
+```{r cache=TRUE, warning=FALSE}
 # ANN
 ann <- neuralnet(ChurnYes ~ . ,data = hotelrand, linear.output = F, stepmax = 1e8)
 str(ann)
@@ -135,7 +135,7 @@ acc_ann <- confusionMatrix(as.factor(hotelrand$is_canceled), as.factor(binary_an
 cat('ANN: ','Accuracy Ratio: ',acc_ann,'Kappa:',kappa_ann)
 ```
 
-```{r}
+```{r cache=TRUE, warning=FALSE}
 # Decision Tree
 dt <- C5.0(ChurnYes ~. , data=hotelrand)
 dt_pred <- predict(dt, hotelrand)
