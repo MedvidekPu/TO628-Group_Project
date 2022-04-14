@@ -102,6 +102,10 @@ hotelrand <- hotel_n[sample(1:nrow(hotel_n)),]
 ## Build the models
 
 ```{r cache=TRUE, warning=FALSE}
+# SAVING AND LOADING MODEL
+#save(model_name, file="model_name.Rdata")
+#load("model_name.Rdata")
+
 # LOGIT
 model_logit <- glm(is_canceled ~., data = hotelrand,  family = "binomial")
 logit_pred <- predict(model_logit, hotelrand, type = "response")
