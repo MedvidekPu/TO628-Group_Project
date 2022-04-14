@@ -67,6 +67,7 @@ str(hotel)
 ## Creating Dummy Variables
 ```{r}
 hoteldummy <- as.data.frame(model.matrix(~.-1,hotel))
+hoteldummy$market_segmentUndefined <- NULL
 str(hotel)
 table(hotel$is_canceled) # Data is balanced
 ```
