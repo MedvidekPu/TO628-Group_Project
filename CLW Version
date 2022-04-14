@@ -110,12 +110,18 @@ CrossTable(binary_logit, hotelrand$is_canceled, prop.chisq = F, prop.r=F, prop.t
 kappa_logit <- caret::confusionMatrix(as.factor(hotelrand$is_canceled), as.factor(binary_logit), positive = "1")$overall[2]
 acc_logit <- caret::confusionMatrix(as.factor(hotelrand$is_canceled), as.factor(binary_logit), positive = "1")$overall[1]
 cat('Linear Regression: ','Accuracy Ratio: ',acc_logit,'Kappa:',kappa_logit)
+```
+
+```{r}
 # KNN
 knn_pred <- knn(train = hotelrand[, names(hotelrand) != "is_canceled"], test = hotelrand[, names(hotelrand) != "is_canceled"], cl = hotelrand$is_canceled, k = 100) 
 CrossTable(knn_pred, hotelrand$is_canceled, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
 kappa_knn <- confusionMatrix(as.factor(hotelrand$is_canceled), as.factor(knn_pred), positive = "1")$overall[2]
 acc_knn <- confusionMatrix(as.factor(hotelrand$is_canceled), as.factor(knn_pred), positive = "1")$overall[1]
 cat('KNN: ','Accuracy Ratio: ',acc_knn,'Kappa:',kappa_knn)
+```
+
+```{r}
 # ANN
 ann <- neuralnet(ChurnYes ~ . ,data = hotelrand, linear.output = F, stepmax = 1e8)
 str(ann)
@@ -127,6 +133,9 @@ CrossTable(hotelrand$is_canceled, binary_ann[,2], prop.chisq = F, prop.r=F, prop
 kappa_ann <- confusionMatrix(as.factor(hotelrand$is_canceled), as.factor(binary_ann[,2]), positive = "1")$overall[2]
 acc_ann <- confusionMatrix(as.factor(hotelrand$is_canceled), as.factor(binary_ann[,2]), positive = "1")$overall[1]
 cat('ANN: ','Accuracy Ratio: ',acc_ann,'Kappa:',kappa_ann)
+```
+
+```{r}
 # Decision Tree
 dt <- C5.0(ChurnYes ~. , data=hotelrand)
 dt_pred <- predict(dt, hotelrand)
