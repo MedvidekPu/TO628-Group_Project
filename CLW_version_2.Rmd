@@ -144,7 +144,7 @@ cat('Decision Tree: ','Accuracy Ratio: ',acc_dt,'Kappa:',kappa_dt)
 
 
 ```{r warning= FALSE}
-combined <- data.frame(binary_logit,knn_pred, binary_ann[,2],dt_pred,hotelrand$is_canceled)
+combined <- data.frame(binary_logit,knn_pred, binary_ann[,2],dt_pred,hotel_test$is_canceled)
 colnames(combined) <- c('binary_logit','knn_pred', 'binary_ann','dt_pred','is_canceled')
 ## Getting Train and Test Samples
 # Selects 10000 random rows for test data
