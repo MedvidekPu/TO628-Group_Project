@@ -153,9 +153,9 @@ colnames(combined) <- c('binary_logit','knn_pred', 'binary_ann','dt_pred','is_ca
 ## Getting Train and Test Samples
 # Selects 10000 random rows for test data
 set.seed(12345)
-test_set <- sample(1:nrow(hotelrand), 0.2*nrow(hotelrand))
-hotel_test <- hotelrand[test_set,]
-hotel_train <- hotelrand[-test_set, ]
+test_set <- sample(1:nrow(combined), 0.2*nrow(combined))
+hotel_test <- combined[test_set,]
+hotel_train <- combined[-test_set, ]
 # Second-Level Decision Tree
 combined_model <- C5.0(is_canceled ~. , data=hotel_train)
 combined_pred <- predict(combined_model, hotel_test)
