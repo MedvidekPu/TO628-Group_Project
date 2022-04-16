@@ -1,3 +1,4 @@
+---
 title: "Group_Project_04072022"
 author: "Chuck Zhou, Carl Weedman, Mark Bruno, Martin Hvezda, Patrick Holstad, and Felipe Prata"
 date: "4/7/2022"
@@ -6,8 +7,6 @@ output:
     toc: true
     toc_float: true
     toc_depth: 5
-    
-    
 ---
 
 ```{r setup, include=FALSE}
@@ -27,14 +26,12 @@ knitr::opts_chunk$set(echo = TRUE)
 5. Pursuing this project will potentially optimize revenue yield management.
 
 ## Data Exploration
-```{r}
+```{r warning=FALSE}
 library(caret)
 library(C50)
 library(gmodels)
 library(class)
 library(neuralnet)
-library(ModelMetrics)
-library(corrplot)
 hotel <- read.csv("hotel_bookings.csv", stringsAsFactors = TRUE)
 ```
 ## Data Cleaning
@@ -71,10 +68,10 @@ hoteldummy$market_segmentUndefined <- NULL
 str(hotel)
 table(hotel$is_canceled) # Data is balanced
 ```
+
 ### Removing Unwanted Characters
 ```{r}
 colnames(hoteldummy) <- gsub("-","",colnames(hoteldummy))
-
 ```
 
 ## Normalize and Randomize Data
@@ -94,12 +91,9 @@ hotel_test <- hotelrand[-split, ]
 ## Build the models
 
 ```{r cache=TRUE, warning=FALSE}
-# SAVING AND LOADING MODEL
-#save(model_name, file="model_name.Rdata")
-#load("model_name.Rdata")
-
 # LOGIT
-model_logit <- glm(is_canceled ~., data = hotel_train,  family = "binomial")
+#model_logit <- glm(is_canceled ~., data = hotel_train,  family = "binomial")
+load("model_logit.Rdata")
 logit_pred <- predict(model_logit, hotel_test, type = "response")
 binary_logit <- ifelse(logit_pred >= 0.5, 1, 0)
 CrossTable(binary_logit, hotel_test$is_canceled, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
@@ -108,44 +102,45 @@ acc_logit <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor
 cat('Linear Regression: ','Accuracy Ratio: ',acc_logit,'Kappa:',kappa_logit)
 ```
 
+
 ```{r cache=TRUE, warning=FALSE}
 # KNN
-knn_pred <- knn(train = hotel_train[, names(hotel_train) != "is_canceled"], test = hotel_test[, names(hotel_test) != "is_canceled"], cl = hotel_train$is_canceled, k = 100) 
+knn_pred <- knn(train = hotel_train[, names(hotel_train) != "is_canceled"], test = hotel_test[, names(hotel_test) != "is_canceled"], cl = hotel_train$is_canceled, k = 303) 
+#load("model_knn.Rdata")
 CrossTable(knn_pred, hotel_test$is_canceled, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
-kappa_knn <- confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(knn_pred), positive = "1")$overall[2]
-acc_knn <- confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(knn_pred), positive = "1")$overall[1]
+kappa_knn <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(knn_pred), positive = "1")$overall[2]
+acc_knn <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(knn_pred), positive = "1")$overall[1]
 cat('KNN: ','Accuracy Ratio: ',acc_knn,'Kappa:',kappa_knn)
 ```
 
 ```{r cache=TRUE, warning=FALSE}
 # ANN
-ann <- neuralnet::neuralnet(is_canceled ~ . ,data = hotel_train)
-save(ann, file="model_ann.Rdata")
-str(ann)
-#predict(ann, hotelrand$is_canceled)
-#ann_result <- compute(ann, hotelrand$is_canceled)
-ann_pred <- data.frame(ann$net.result)
-binary_ann <- ifelse(ann_pred >= 0.5, 1, 0)
-CrossTable(hotel_test$is_canceled, binary_ann[,2], prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
-kappa_ann <- confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(binary_ann[,2]), positive = "1")$overall[2]
-acc_ann <- confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(binary_ann[,2]), positive = "1")$overall[1]
+#ann <- neuralnet::neuralnet(is_canceled ~ . ,data = hotel_train)
+load("model_ann.Rdata")
+ann_pred <- predict(ann, hotel_test)
+
+binary_ann <- ifelse(ann_pred >= 0.4, 1, 0)
+CrossTable(hotel_test$is_canceled, binary_ann, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+kappa_ann <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(binary_ann), positive = "1")$overall[2]
+acc_ann <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(binary_ann), positive = "1")$overall[1]
 cat('ANN: ','Accuracy Ratio: ',acc_ann,'Kappa:',kappa_ann)
 ```
 
 ```{r cache=TRUE, warning=FALSE}
 # Decision Tree
-dt <- C5.0(is_canceled ~. , data=hotel_train)
+dt <- C5.0(as.factor(is_canceled) ~. , data=hotel_train)
 dt_pred <- predict(dt, hotel_test)
 CrossTable(hotel_test$is_canceled, dt_pred, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
-kappa_dt <- confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(dt_pred), positive = "1")$overall[2]
-acc_dt <- confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(dt_pred), positive = "1")$overall[1]
+kappa_dt <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(dt_pred), positive = "1")$overall[2]
+acc_dt <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(dt_pred), positive = "1")$overall[1]
+
 cat('Decision Tree: ','Accuracy Ratio: ',acc_dt,'Kappa:',kappa_dt)
 ```
 ## Build a stacked model
 
 
 ```{r warning= FALSE}
-combined <- data.frame(binary_logit,knn_pred, binary_ann[,2],dt_pred,hotelrand$is_canceled)
+combined <- data.frame(binary_logit,knn_pred, binary_ann,dt_pred,hotel_test$is_canceled)
 colnames(combined) <- c('binary_logit','knn_pred', 'binary_ann','dt_pred','is_canceled')
 ## Getting Train and Test Samples
 # Selects 10000 random rows for test data
@@ -154,11 +149,11 @@ test_set <- sample(1:nrow(combined), 0.2*nrow(combined))
 hotel_test_2 <- combined[test_set,]
 hotel_train_2 <- combined[-test_set, ]
 # Second-Level Decision Tree
-combined_model <- C5.0(is_canceled ~. , data=hotel_train_2)
+combined_model <- C5.0(as.factor(is_canceled) ~. , data=hotel_train_2)
 combined_pred <- predict(combined_model, hotel_test_2)
 CrossTable(hotel_test_2$is_canceled, combined_pred, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
-kappa_combined <- confusionMatrix(as.factor(hotel_test_2$is_canceled), as.factor(combined_pred), positive = "1")$overall[2]
-acc_combined <- confusionMatrix(as.factor(hotel_test_2$is_canceled), as.factor(combined_pred), positive = "1")$overall[1]
+kappa_combined <- caret::confusionMatrix(as.factor(hotel_test_2$is_canceled), as.factor(combined_pred), positive = "1")$overall[2]
+acc_combined <- caret::confusionMatrix(as.factor(hotel_test_2$is_canceled), as.factor(combined_pred), positive = "1")$overall[1]
 plot(combined_model)
 cat('Combined model: ','Accuracy Ratio: ',acc_combined,'Kappa:',kappa_combined)
 ```
