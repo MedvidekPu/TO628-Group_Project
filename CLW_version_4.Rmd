@@ -1,0 +1,173 @@
+---
+title: "Group_Project_04072022"
+author: "Chuck Zhou, Carl Weedman, Mark Bruno, Martin Hvezda, Patrick Holstad, and Felipe Prata"
+date: "4/7/2022"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Project Summary
+
+###Business Problem: We are trying to predict which hotel customers are most likely to "no-show" or "cancel" their bookings. By figuring out the likeliness of a customer that is a "no-show" or "cancels" their booking, hotels can overbook their rooms, maximize occupied rooms, and maximize revenue.
+
+###Models used: We used a total of 4 different individual models: Logistic Regression, KNN, ANN, and Decision Tree. We also created a "stacked model" using all 4 of the individual models. We evaluated each model using the "Kappa" value and the "Accuracy Ratio".
+
+###Results:
+*Logistic Model:*
+  Accuracy Ratio: 0.8242
+  Kappa: 0.61213
+*KNN Model:*
+  Accuracy Ratio: 0.7800
+  Kappa: 0.5003
+*ANN Model:*
+  Accuracy Ratio: 0.8245
+  Kappa: 0.6282
+*Decision Tree*
+  Accuracy Ratio: 0.8604
+  Kappa: 0.6957
+*Stacked Model:*
+  Accuracy Ratio: 0.7782
+  Kappa: 0.4953
+
+###Conclusion:
+We recommend using the Decision Tree model produced because it has the highest Accuracy Ratio and Kappa values. The Decision Tree model was able to predict about 77.04% of all the customers that would "no-show" or "cancel" and has a false positive of only 22.95%. Therefore, hotels should overbook their rooms by no more that 54.09% based on the data provided. 
+
+## Data Exploration
+```{r warning=FALSE, results=FALSE}
+library(caret)
+library(C50)
+library(gmodels)
+library(class)
+library(neuralnet)
+hotel <- read.csv("hotel_bookings.csv", stringsAsFactors = TRUE)
+```
+## Data Cleaning
+### Reducing # of Levels for Agents, Company, and Country
+```{r}
+#sort(table(hotel$agent), decreasing = TRUE)[1:10]
+hotel$newagent <- ifelse(hotel$agent == "9" | hotel$agent == "NULL" | hotel$agent == "240" | hotel$agent == "1"| hotel$agent == "14" | hotel$agent == "7" | hotel$agent == "6",  hotel$agent, "other")
+#sort(table(hotel$newagent), decreasing = TRUE)
+#sort(table(hotel$company), decreasing = TRUE)[1:10]
+hotel$newcompany <- ifelse(hotel$company == "40" | hotel$company == "NULL" | hotel$company == "223" ,  hotel$company, "other")
+#sort(table(hotel$newcompany), decreasing = TRUE)
+#sort(table(hotel$country), decreasing = TRUE)[1:10]
+hotel$newcountry <- ifelse(hotel$country == "PRT" | hotel$country == "GBR" | hotel$country == "FRA" | hotel$country == "ESP" | hotel$country == "DEU",  hotel$country, "other")
+#sort(table(hotel$newcountry), decreasing = TRUE)[1:10]
+hotel$newagent <- as.factor(hotel$newagent)
+hotel$newcompany <- as.factor(hotel$newcompany)
+hotel$newcountry <- as.factor(hotel$newcountry)
+```
+
+### Removing Unnecessary Columns
+```{r}
+hotel$reservation_status_date <- NULL
+hotel$arrival_date_year <- NULL
+hotel$agent <- NULL
+hotel$company <- NULL
+hotel$country <- NULL
+hotel$reservation_status <- NULL
+str(hotel)
+```
+## Creating Dummy Variables
+```{r}
+hoteldummy <- as.data.frame(model.matrix(~.-1,hotel))
+hoteldummy$market_segmentUndefined <- NULL
+str(hotel)
+table(hotel$is_canceled) # Data is balanced
+```
+
+### Removing Unwanted Characters
+```{r}
+colnames(hoteldummy) <- gsub("-","",colnames(hoteldummy))
+```
+
+## Normalize and Randomize Data
+```{r}
+normalize <- function(x){
+  (x-min(x))/(max(x)-min(x))
+}
+hotel_n <- as.data.frame(lapply(hoteldummy, normalize))
+hotelrand <- hotel_n[sample(1:nrow(hotel_n)),]
+
+set.seed(12345)
+split <- sample(1:nrow(hotelrand), 0.5*nrow(hotelrand))
+hotel_train <- hotelrand[split,]
+hotel_test <- hotelrand[-split, ]
+```
+
+## Build the models
+
+```{r cache=TRUE, warning=FALSE}
+# LOGIT
+model_logit <- glm(is_canceled ~., data = hotel_train,  family = "binomial")
+#load("model_logit.Rdata")
+logit_pred <- predict(model_logit, hotel_test, type = "response")
+binary_logit <- ifelse(logit_pred >= 0.5, 1, 0)
+CrossTable(binary_logit, hotel_test$is_canceled, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+kappa_logit <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(binary_logit), positive = "1")$overall[2]
+acc_logit <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(binary_logit), positive = "1")$overall[1]
+cat('Linear Regression: ','Accuracy Ratio: ',acc_logit,'Kappa:',kappa_logit)
+```
+
+
+```{r cache=TRUE, warning=FALSE}
+# KNN
+knn_pred <- knn(train = hotel_train[, names(hotel_train) != "is_canceled"], test = hotel_test[, names(hotel_test) != "is_canceled"], cl = hotel_train$is_canceled, k = 303) 
+#load("model_knn.Rdata")
+CrossTable(knn_pred, hotel_test$is_canceled, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+kappa_knn <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(knn_pred), positive = "1")$overall[2]
+acc_knn <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(knn_pred), positive = "1")$overall[1]
+cat('KNN: ','Accuracy Ratio: ',acc_knn,'Kappa:',kappa_knn)
+```
+
+```{r cache=TRUE, warning=FALSE}
+# ANN
+#ann <- neuralnet::neuralnet(is_canceled ~ . ,data = hotel_train)
+load("model_ann.Rdata")
+ann_pred <- predict(ann, hotel_test)
+
+binary_ann <- ifelse(ann_pred >= 0.4, 1, 0)
+CrossTable(hotel_test$is_canceled, binary_ann, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+kappa_ann <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(binary_ann), positive = "1")$overall[2]
+acc_ann <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(binary_ann), positive = "1")$overall[1]
+cat('ANN: ','Accuracy Ratio: ',acc_ann,'Kappa:',kappa_ann)
+```
+
+```{r cache=TRUE, warning=FALSE}
+# Decision Tree
+dt <- C5.0(as.factor(is_canceled) ~. , data=hotel_train)
+dt_pred <- predict(dt, hotel_test)
+CrossTable(hotel_test$is_canceled, dt_pred, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+kappa_dt <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(dt_pred), positive = "1")$overall[2]
+acc_dt <- caret::confusionMatrix(as.factor(hotel_test$is_canceled), as.factor(dt_pred), positive = "1")$overall[1]
+
+cat('Decision Tree: ','Accuracy Ratio: ',acc_dt,'Kappa:',kappa_dt)
+```
+## Build a stacked model
+
+
+```{r warning= FALSE}
+combined <- data.frame(binary_logit,knn_pred, binary_ann,dt_pred,hotel_test$is_canceled)
+colnames(combined) <- c('binary_logit','knn_pred', 'binary_ann','dt_pred','is_canceled')
+## Getting Train and Test Samples
+# Selects 10000 random rows for test data
+set.seed(12345)
+test_set <- sample(1:nrow(combined), 0.2*nrow(combined))
+hotel_test_2 <- combined[test_set,]
+hotel_train_2 <- combined[-test_set, ]
+# Second-Level Decision Tree
+combined_model <- C5.0(as.factor(is_canceled) ~. , data=hotel_train_2)
+combined_pred <- predict(combined_model, hotel_test_2)
+CrossTable(hotel_test_2$is_canceled, combined_pred, prop.chisq = F, prop.r=F, prop.t = F, dnn=c('Actuals','Prediction'))
+kappa_combined <- caret::confusionMatrix(as.factor(hotel_test_2$is_canceled), as.factor(combined_pred), positive = "1")$overall[2]
+acc_combined <- caret::confusionMatrix(as.factor(hotel_test_2$is_canceled), as.factor(combined_pred), positive = "1")$overall[1]
+plot(combined_model)
+cat('Combined model: ','Accuracy Ratio: ',acc_combined,'Kappa:',kappa_combined)
+```
